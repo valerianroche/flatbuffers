@@ -18,16 +18,19 @@
 #include "flatbuffers/idl.h"
 #include "flatbuffers/util.h"
 
+#include <limits>
+
 static void Error(const std::string &err, bool usage = false,
                   bool show_exe_name = true);
 
 // This struct allows us to create a table of all possible output generators
 // for the various programming languages and formats we support.
 struct Generator {
-  bool (*generate)(const flatbuffers::Parser &parser,
+  typedef bool (*GeneratorFunction)(const flatbuffers::Parser &parser,
                    const std::string &path,
                    const std::string &file_name,
                    const flatbuffers::GeneratorOptions &opts);
+  GeneratorFunction generate;
   const char *generator_opt;
   const char *lang_name;
   flatbuffers::GeneratorOptions::Language lang;
@@ -48,26 +51,10 @@ const Generator generators[] = {
     flatbuffers::GeneratorOptions::kMAX,
     "Generate text output for any data definitions",
     flatbuffers::TextMakeRule },
-  { flatbuffers::GenerateCPP,      "-c", "C++",
+  { static_cast<Generator::GeneratorFunction>(flatbuffers::GenerateCPP),      "-c", "C++",
     flatbuffers::GeneratorOptions::kMAX,
     "Generate C++ headers for tables/structs",
-    flatbuffers::CPPMakeRule },
-  { flatbuffers::GenerateGo,       "-g", "Go",
-    flatbuffers::GeneratorOptions::kGo,
-    "Generate Go files for tables/structs",
-    flatbuffers::GeneralMakeRule },
-  { flatbuffers::GenerateGeneral,  "-j", "Java",
-    flatbuffers::GeneratorOptions::kJava,
-    "Generate Java classes for tables/structs",
-    flatbuffers::GeneralMakeRule },
-  { flatbuffers::GenerateGeneral,  "-n", "C#",
-    flatbuffers::GeneratorOptions::kCSharp,
-    "Generate C# classes for tables/structs",
-    flatbuffers::GeneralMakeRule },
-  { flatbuffers::GeneratePython,   "-p", "Python",
-    flatbuffers::GeneratorOptions::kMAX,
-    "Generate Python files for tables/structs",
-    flatbuffers::GeneralMakeRule },
+    flatbuffers::CPPMakeRule }
 };
 
 const char *program_name = NULL;
@@ -185,7 +172,7 @@ int main(int argc, const char *argv[]) {
 
   // Now process the files:
   flatbuffers::Parser parser(opts.strict_json, proto_mode);
-  for (auto file_it = filenames.begin();
+  for (std::vector<std::string>::const_iterator file_it = filenames.begin();
             file_it != filenames.end();
           ++file_it) {
       std::string contents;
@@ -220,7 +207,7 @@ int main(int argc, const char *argv[]) {
           }
         }
       } else {
-        auto local_include_directory = flatbuffers::StripFileName(*file_it);
+        const std::string & local_include_directory = flatbuffers::StripFileName(*file_it);
         include_directories.push_back(local_include_directory.c_str());
         include_directories.push_back(nullptr);
         if (!parser.Parse(contents.c_str(), &include_directories[0],

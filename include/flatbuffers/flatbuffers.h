@@ -19,24 +19,19 @@
 
 #include <assert.h>
 
-#include <cstdint>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <string>
-#include <type_traits>
 #include <vector>
 #include <algorithm>
 #include <functional>
 #include <memory>
-
-#if __cplusplus <= 199711L && \
-    (!defined(_MSC_VER) || _MSC_VER < 1600) && \
-    (!defined(__GNUC__) || \
-      (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__ < 40603))
-  #error A C++11 compatible compiler is required for FlatBuffers.
-  #error __cplusplus _MSC_VER __GNUC__  __GNUC_MINOR__  __GNUC_PATCHLEVEL__
-#endif
+#include <boost/bind.hpp>
+#include <boost/static_assert.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/type_traits.hpp>
+#include <boost/function.hpp>
 
 // The wire format uses a little endian encoding (since that's efficient for
 // the common platforms).
@@ -71,6 +66,28 @@
   #define FLATBUFFERS_FINAL_CLASS
 #endif
 
+class nullptr_t {
+public:
+  template<class T>          // convertible to any type
+    operator T*() const      // of null non-member
+    { return 0; }            // pointer...
+  template<class C, class T> // or any type of null
+    operator T C::*() const  // member pointer...
+    { return 0; }
+private:
+  void operator&() const;    // whose address can't be taken
+};
+
+const nullptr_t nullptr = {};
+
+namespace std {
+   template<bool B, class T, class F>
+   struct conditional { typedef T type; };
+
+   template<class T, class F>
+   struct conditional<false, T, F> { typedef F type; };
+}
+
 namespace flatbuffers {
 
 // Our default offset / size type, 32bit on purpose on 64bit systems.
@@ -88,7 +105,8 @@ typedef uint16_t voffset_t;
 typedef uintmax_t largest_scalar_t;
 
 // Pointer to relinquished memory.
-typedef std::unique_ptr<uint8_t, std::function<void(uint8_t * /* unused */)>>
+//typedef boost::shared_ptr<uint8_t, boost::function<void(uint8_t * /* unused */)> >
+typedef boost::shared_ptr<uint8_t>
           unique_ptr_t;
 
 // Wrapper for uoffset_t to allow safe template specialization.
@@ -123,13 +141,13 @@ template<typename T> T EndianScalar(T t) {
     if (sizeof(T) == 1) {   // Compile-time if-then's.
       return t;
     } else if (sizeof(T) == 2) {
-      auto r = __builtin_bswap16(*reinterpret_cast<uint16_t *>(&t));
+      uint16_t r = __builtin_bswap16(*reinterpret_cast<uint16_t *>(&t));
       return *reinterpret_cast<T *>(&r);
     } else if (sizeof(T) == 4) {
-      auto r = __builtin_bswap32(*reinterpret_cast<uint32_t *>(&t));
+      uint32_t r = __builtin_bswap32(*reinterpret_cast<uint32_t *>(&t));
       return *reinterpret_cast<T *>(&r);
     } else if (sizeof(T) == 8) {
-      auto r = __builtin_bswap64(*reinterpret_cast<uint64_t *>(&t));
+      uint64_t r = __builtin_bswap64(*reinterpret_cast<uint64_t *>(&t));
       return *reinterpret_cast<T *>(&r);
     } else {
       assert(0);
@@ -154,7 +172,7 @@ template<typename T> size_t AlignOf() {
   #ifdef _MSC_VER
     return __alignof(T);
   #else
-    return alignof(T);
+    return boost::alignment_of<T>::value;
   #endif
 }
 
@@ -173,7 +191,7 @@ template<typename T> struct IndirectHelper {
     return EndianScalar((reinterpret_cast<const T *>(p))[i]);
   }
 };
-template<typename T> struct IndirectHelper<Offset<T>> {
+template<typename T> struct IndirectHelper<Offset<T> > {
   typedef const T *return_type;
   static const size_t element_stride = sizeof(uoffset_t);
   static return_type Read(const uint8_t *p, uoffset_t i) {
@@ -207,14 +225,14 @@ public:
   VectorIterator(const uint8_t *data, uoffset_t i) :
       data_(data + IndirectHelper<T>::element_stride * i) {};
   VectorIterator(const VectorIterator &other) : data_(other.data_) {}
-  VectorIterator(VectorIterator &&other) : data_(std::move(other.data_)) {}
+  VectorIterator(VectorIterator &other) : data_(other.data_) {}
 
   VectorIterator &operator=(const VectorIterator &other) {
     data_ = other.data_;
     return *this;
   }
 
-  VectorIterator &operator=(VectorIterator &&other) {
+  VectorIterator &operator=(VectorIterator &other) {
     data_ = other.data_;
     return *this;
   }
@@ -231,11 +249,11 @@ public:
     return (data_ - other.data_) / IndirectHelper<T>::element_stride;
   }
 
-  typename super_type::value_type operator *() const {
+  typename super_type::value_type const operator *() const {
     return IndirectHelper<T>::Read(data_, 0);
   }
 
-  typename super_type::value_type operator->() const {
+  typename super_type::value_type const operator->() const {
     return IndirectHelper<T>::Read(data_, 0);
   }
 
@@ -345,7 +363,7 @@ private:
   template<typename K> static int KeyCompare(const void *ap, const void *bp) {
     const K *key = reinterpret_cast<const K *>(ap);
     const uint8_t *data = reinterpret_cast<const uint8_t *>(bp);
-    auto table = IndirectHelper<T>::Read(data, 0);
+    return_type table = IndirectHelper<T>::Read(data, 0);
 
     // std::bsearch compares with the operands transposed, so we negate the
     // result here.
@@ -424,8 +442,8 @@ class vector_downward {
   // Relinquish the pointer to the caller.
   unique_ptr_t release() {
     // Actually deallocate from the start of the allocated memory.
-    std::function<void(uint8_t *)> deleter(
-      std::bind(&simple_allocator::deallocate, allocator_, buf_));
+    boost::function<void(uint8_t *)> deleter(
+      boost::bind(&simple_allocator::deallocate, allocator_, buf_));
 
     // Point to the desired offset.
     unique_ptr_t retval(data(), deleter);
@@ -443,13 +461,13 @@ class vector_downward {
 
   uint8_t *make_space(size_t len) {
     if (len > static_cast<size_t>(cur_ - buf_)) {
-      auto old_size = size();
-      auto largest_align = AlignOf<largest_scalar_t>();
+      uoffset_t old_size = size();
+      size_t largest_align = AlignOf<largest_scalar_t>();
       reserved_ += std::max(len, growth_policy(reserved_));
       // Round up to avoid undefined behavior from unaligned loads and stores.
       reserved_ = (reserved_ + (largest_align - 1)) & ~(largest_align - 1);
-      auto new_buf = allocator_.allocate(reserved_);
-      auto new_cur = new_buf + reserved_ - old_size;
+      uint8_t * new_buf = allocator_.allocate(reserved_);
+      uint8_t * new_cur = new_buf + reserved_ - old_size;
       memcpy(new_cur, cur_, old_size);
       cur_ = new_cur;
       allocator_.deallocate(buf_);
@@ -477,12 +495,12 @@ class vector_downward {
   // push() & fill() are most frequently called with small byte counts (<= 4),
   // which is why we're using loops rather than calling memcpy/memset.
   void push(const uint8_t *bytes, size_t num) {
-    auto dest = make_space(num);
+    uint8_t * dest = make_space(num);
     for (size_t i = 0; i < num; i++) dest[i] = bytes[i];
   }
 
   void fill(size_t zero_pad_bytes) {
-    auto dest = make_space(zero_pad_bytes);
+    uint8_t * dest = make_space(zero_pad_bytes);
     for (size_t i = 0; i < zero_pad_bytes; i++) dest[i] = 0;
   }
 
@@ -570,9 +588,9 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
 
   template<typename T> void AssertScalarT() {
     // The code assumes power of 2 sizes and endian-swap-ability.
-    static_assert(std::is_scalar<T>::value
-        // The Offset<T> type is essentially a scalar but fails is_scalar.
-        || sizeof(T) == sizeof(Offset<void>),
+      // The Offset<T> type is essentially a scalar but fails is_scalar.
+    BOOST_STATIC_ASSERT_MSG(boost::is_scalar<T>::value \
+        || sizeof(T) == sizeof(Offset<void>), \
            "T must be a scalar type");
   }
 
@@ -601,7 +619,7 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
   template<typename T> void AddElement(voffset_t field, T e, T def) {
     // We don't serialize values equal to the default.
     if (e == def && !force_defaults_) return;
-    auto off = PushElement(e);
+    uoffset_t off = PushElement(e);
     TrackField(field, off);
   }
 
@@ -649,33 +667,33 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
   uoffset_t EndTable(uoffset_t start, voffset_t numfields) {
     // Write the vtable offset, which is the start of any Table.
     // We fill it's value later.
-    auto vtableoffsetloc = PushElement<soffset_t>(0);
+    uoffset_t vtableoffsetloc = PushElement<soffset_t>(0);
     // Write a vtable, which consists entirely of voffset_t elements.
     // It starts with the number of offsets, followed by a type id, followed
     // by the offsets themselves. In reverse:
     buf_.fill(numfields * sizeof(voffset_t));
-    auto table_object_size = vtableoffsetloc - start;
+    uoffset_t table_object_size = vtableoffsetloc - start;
     assert(table_object_size < 0x10000);  // Vtable use 16bit offsets.
     PushElement<voffset_t>(static_cast<voffset_t>(table_object_size));
     PushElement<voffset_t>(FieldIndexToOffset(numfields));
     // Write the offsets into the table
-    for (auto field_location = offsetbuf_.begin();
+    for (std::vector<FieldLoc>::const_iterator field_location = offsetbuf_.begin();
               field_location != offsetbuf_.end();
             ++field_location) {
-      auto pos = static_cast<voffset_t>(vtableoffsetloc - field_location->off);
+      voffset_t  pos = static_cast<voffset_t>(vtableoffsetloc - field_location->off);
       // If this asserts, it means you've set a field twice.
       assert(!ReadScalar<voffset_t>(buf_.data() + field_location->id));
       WriteScalar<voffset_t>(buf_.data() + field_location->id, pos);
     }
     offsetbuf_.clear();
-    auto vt1 = reinterpret_cast<voffset_t *>(buf_.data());
-    auto vt1_size = ReadScalar<voffset_t>(vt1);
-    auto vt_use = GetSize();
+    voffset_t * vt1 = reinterpret_cast<voffset_t *>(buf_.data());
+    voffset_t vt1_size = ReadScalar<voffset_t>(vt1);
+    uoffset_t vt_use = GetSize();
     // See if we already have generated a vtable with this exact same
     // layout before. If so, make it point to the old one, remove this one.
-    for (auto it = vtables_.begin(); it != vtables_.end(); ++it) {
-      auto vt2 = reinterpret_cast<voffset_t *>(buf_.data_at(*it));
-      auto vt2_size = *vt2;
+    for (std::vector<uoffset_t>::const_iterator it = vtables_.begin(); it != vtables_.end(); ++it) {
+      voffset_t * vt2 = reinterpret_cast<voffset_t *>(buf_.data_at(*it));
+      voffset_t vt2_size = *vt2;
       if (vt1_size != vt2_size || memcmp(vt2, vt1, vt1_size)) continue;
       vt_use = *it;
       buf_.pop(GetSize() - vtableoffsetloc);
@@ -699,8 +717,8 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
   // This checks a required field has been set in a given table that has
   // just been constructed.
   template<typename T> void Required(Offset<T> table, voffset_t field) {
-    auto table_ptr = buf_.data_at(table.o);
-    auto vtable_ptr = table_ptr - ReadScalar<soffset_t>(table_ptr);
+    uint8_t * table_ptr = buf_.data_at(table.o);
+    uint8_t * vtable_ptr = table_ptr - ReadScalar<soffset_t>(table_ptr);
     bool ok = ReadScalar<voffset_t>(vtable_ptr + field) != 0;
     // If this fails, the caller will show what field needs to be set.
     assert(ok);
@@ -761,46 +779,40 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
     return buf_.make_space(len * elemsize);
   }
 
-  template<typename T> Offset<Vector<T>> CreateVector(const T *v, size_t len) {
+  template<typename T> Offset<Vector<T> > CreateVector(const T *v, size_t len) {
     NotNested();
     StartVector(len, sizeof(T));
-    for (auto i = len; i > 0; ) {
+    for (size_t i = len; i > 0; ) {
       PushElement(v[--i]);
     }
-    return Offset<Vector<T>>(EndVector(len));
+    return Offset<Vector<T> >(EndVector(len));
   }
 
-  template<typename T> Offset<Vector<T>> CreateVector(const std::vector<T> &v) {
+  template<typename T> Offset<Vector<T> > CreateVector(const std::vector<T> &v) {
     return CreateVector(v.data(), v.size());
   }
 
-  template<typename T> Offset<Vector<const T *>> CreateVectorOfStructs(
+  template<typename T> Offset<Vector<const T *> > CreateVectorOfStructs(
                                                        const T *v, size_t len) {
     NotNested();
     StartVector(len * sizeof(T) / AlignOf<T>(), AlignOf<T>());
     PushBytes(reinterpret_cast<const uint8_t *>(v), sizeof(T) * len);
-    return Offset<Vector<const T *>>(EndVector(len));
+    return Offset<Vector<const T *> >(EndVector(len));
   }
 
-  template<typename T> Offset<Vector<const T *>> CreateVectorOfStructs(
+  template<typename T> Offset<Vector<const T *> > CreateVectorOfStructs(
                                                       const std::vector<T> &v) {
     return CreateVectorOfStructs(v.data(), v.size());
   }
 
-  template<typename T> Offset<Vector<Offset<T>>> CreateVectorOfSortedTables(
+  template<typename T> Offset<Vector<Offset<T> > > CreateVectorOfSortedTables(
                                                      Offset<T> *v, size_t len) {
-    std::sort(v, v + len,
-      [this](const Offset<T> &a, const Offset<T> &b) -> bool {
-        auto table_a = reinterpret_cast<T *>(buf_.data_at(a.o));
-        auto table_b = reinterpret_cast<T *>(buf_.data_at(b.o));
-        return table_a->KeyCompareLessThan(table_b);
-      }
-    );
+    std::sort(v, v + len, boost::bind(&FlatBufferBuilder::KeyCompareLessThan<T>, this, _1, _2));
     return CreateVector(v, len);
   }
 
-  template<typename T> Offset<Vector<Offset<T>>> CreateVectorOfSortedTables(
-                                                    std::vector<Offset<T>> *v) {
+  template<typename T> Offset<Vector<Offset<T> > > CreateVectorOfSortedTables(
+                                                    std::vector<Offset<T> > *v) {
     return CreateVectorOfSortedTables(v->data(), v->size());
   }
 
@@ -814,7 +826,7 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
     return EndVector(len);
   }
 
-  template<typename T> Offset<Vector<T>> CreateUninitializedVector(
+  template<typename T> Offset<Vector<T> > CreateUninitializedVector(
                                                     size_t len, T **buf) {
     return CreateUninitializedVector(len, sizeof(T),
                                      reinterpret_cast<uint8_t **>(buf));
@@ -839,6 +851,15 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
   }
 
  private:
+
+  template<typename T>
+  bool KeyCompareLessThan(const Offset<T> &a, const Offset<T> &b)
+  {
+   T *table_a = reinterpret_cast<T *>(buf_.data_at(a.o));
+   T *table_b = reinterpret_cast<T *>(buf_.data_at(b.o));
+   return table_a->KeyCompareLessThan(table_b);
+  }
+
   // You shouldn't really be copying instances of this class.
   FlatBufferBuilder(const FlatBufferBuilder &);
   FlatBufferBuilder &operator=(const FlatBufferBuilder &);
@@ -935,14 +956,14 @@ class Verifier FLATBUFFERS_FINAL_CLASS {
     if (!Verify<uoffset_t>(vec)) return false;
     // Check the whole array. If this is a string, the byte past the array
     // must be 0.
-    auto size = ReadScalar<uoffset_t>(vec);
-    auto byte_size = sizeof(size) + elem_size * size;
+    uoffset_t size = ReadScalar<uoffset_t>(vec);
+    size_t byte_size = sizeof(size) + elem_size * size;
     *end = vec + byte_size;
     return Verify(vec, byte_size);
   }
 
   // Special case for string contents, after the above has been called.
-  bool VerifyVectorOfStrings(const Vector<Offset<String>> *vec) const {
+  bool VerifyVectorOfStrings(const Vector<Offset<String> > *vec) const {
       if (vec) {
         for (uoffset_t i = 0; i < vec->size(); i++) {
           if (!Verify(vec->Get(i))) return false;
@@ -952,7 +973,7 @@ class Verifier FLATBUFFERS_FINAL_CLASS {
   }
 
   // Special case for table contents, after the above has been called.
-  template<typename T> bool VerifyVectorOfTables(const Vector<Offset<T>> *vec) {
+  template<typename T> bool VerifyVectorOfTables(const Vector<Offset<T> > *vec) {
     if (vec) {
       for (uoffset_t i = 0; i < vec->size(); i++) {
         if (!vec->Get(i)->Verify(*this)) return false;
@@ -1005,7 +1026,7 @@ class Struct FLATBUFFERS_FINAL_CLASS {
   }
 
   template<typename T> T GetPointer(uoffset_t o) const {
-    auto p = &data_[o];
+    uint8_t * p = &data_[o];
     return reinterpret_cast<T>(p + ReadScalar<uoffset_t>(p));
   }
 
@@ -1028,22 +1049,22 @@ class Table {
   // if the field was not present.
   voffset_t GetOptionalFieldOffset(voffset_t field) const {
     // The vtable offset is always at the start.
-    auto vtable = data_ - ReadScalar<soffset_t>(data_);
+    const uint8_t * vtable = data_ - ReadScalar<soffset_t>(data_);
     // The first element is the size of the vtable (fields + type id + itself).
-    auto vtsize = ReadScalar<voffset_t>(vtable);
+    voffset_t vtsize = ReadScalar<voffset_t>(vtable);
     // If the field we're accessing is outside the vtable, we're reading older
     // data, so it's the same as if the offset was 0 (not present).
     return field < vtsize ? ReadScalar<voffset_t>(vtable + field) : 0;
   }
 
   template<typename T> T GetField(voffset_t field, T defaultval) const {
-    auto field_offset = GetOptionalFieldOffset(field);
+    voffset_t field_offset = GetOptionalFieldOffset(field);
     return field_offset ? ReadScalar<T>(data_ + field_offset) : defaultval;
   }
 
   template<typename P> P GetPointer(voffset_t field) {
-    auto field_offset = GetOptionalFieldOffset(field);
-    auto p = data_ + field_offset;
+    voffset_t field_offset = GetOptionalFieldOffset(field);
+    uint8_t *p = data_ + field_offset;
     return field_offset
       ? reinterpret_cast<P>(p + ReadScalar<uoffset_t>(p))
       : nullptr;
@@ -1053,27 +1074,27 @@ class Table {
   }
 
   template<typename P> P GetStruct(voffset_t field) const {
-    auto field_offset = GetOptionalFieldOffset(field);
-    auto p = const_cast<uint8_t *>(data_ + field_offset);
+    voffset_t field_offset = GetOptionalFieldOffset(field);
+    uint8_t * p = const_cast<uint8_t *>(data_ + field_offset);
     return field_offset ? reinterpret_cast<P>(p) : nullptr;
   }
 
   template<typename T> bool SetField(voffset_t field, T val) {
-    auto field_offset = GetOptionalFieldOffset(field);
+    voffset_t field_offset = GetOptionalFieldOffset(field);
     if (!field_offset) return false;
     WriteScalar(data_ + field_offset, val);
     return true;
   }
 
   bool SetPointer(voffset_t field, const uint8_t *val) {
-    auto field_offset = GetOptionalFieldOffset(field);
+    voffset_t field_offset = GetOptionalFieldOffset(field);
     if (!field_offset) return false;
     WriteScalar(data_ + field_offset, val - (data_ + field_offset));
     return true;
   }
 
   uint8_t *GetAddressOf(voffset_t field) {
-    auto field_offset = GetOptionalFieldOffset(field);
+    voffset_t field_offset = GetOptionalFieldOffset(field);
     return field_offset ? data_ + field_offset : nullptr;
   }
   const uint8_t *GetAddressOf(voffset_t field) const {
@@ -1091,7 +1112,7 @@ class Table {
   bool VerifyTableStart(Verifier &verifier) const {
     // Check the vtable offset.
     if (!verifier.Verify<soffset_t>(data_)) return false;
-    auto vtable = data_ - ReadScalar<soffset_t>(data_);
+    const uint8_t * vtable = data_ - ReadScalar<soffset_t>(data_);
     // Check the vtable size field, then check vtable fits in its entirety.
     return verifier.VerifyComplexity() &&
            verifier.Verify<voffset_t>(vtable) &&
@@ -1103,7 +1124,7 @@ class Table {
                                         voffset_t field) const {
     // Calling GetOptionalFieldOffset should be safe now thanks to
     // VerifyTable().
-    auto field_offset = GetOptionalFieldOffset(field);
+    voffset_t field_offset = GetOptionalFieldOffset(field);
     // Check the actual field.
     return !field_offset || verifier.Verify<T>(data_ + field_offset);
   }
@@ -1111,7 +1132,7 @@ class Table {
   // VerifyField for required fields.
   template<typename T> bool VerifyFieldRequired(const Verifier &verifier,
                                         voffset_t field) const {
-    auto field_offset = GetOptionalFieldOffset(field);
+    voffset_t field_offset = GetOptionalFieldOffset(field);
     return verifier.Check(field_offset != 0) &&
            verifier.Verify<T>(data_ + field_offset);
   }
@@ -1151,14 +1172,14 @@ inline int LookupEnum(const char **names, const char *name) {
     struct __declspec(align(alignment))
   #define STRUCT_END(name, size) \
     __pragma(pack()); \
-    static_assert(sizeof(name) == size, "compiler breaks packing rules")
+    BOOST_STATIC_ASSERT_MSG(sizeof(name) == size, "compiler breaks packing rules")
 #elif defined(__GNUC__) || defined(__clang__)
   #define MANUALLY_ALIGNED_STRUCT(alignment) \
     _Pragma("pack(1)") \
     struct __attribute__((aligned(alignment)))
   #define STRUCT_END(name, size) \
     _Pragma("pack()") \
-    static_assert(sizeof(name) == size, "compiler breaks packing rules")
+    BOOST_STATIC_ASSERT_MSG(sizeof(name) == size, "compiler breaks packing rules")
 #else
   #error Unknown compiler, please define structure alignment macros
 #endif

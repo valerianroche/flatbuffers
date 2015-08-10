@@ -17,8 +17,10 @@
 #ifndef FLATBUFFERS_HASH_H_
 #define FLATBUFFERS_HASH_H_
 
-#include <cstdint>
+#include <stdint.h>
 #include <cstring>
+
+#include "flatbuffers/flatbuffers.h"
 
 namespace flatbuffers {
 

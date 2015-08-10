@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.6)
 
 project(FlatBuffers)
 
@@ -32,8 +32,6 @@ set(FlatBuffers_Compiler_SRCS
   ${FlatBuffers_Library_SRCS}
   src/idl_gen_cpp.cpp
   src/idl_gen_general.cpp
-  src/idl_gen_go.cpp
-  src/idl_gen_python.cpp
   src/idl_gen_fbs.cpp
   src/flatc.cpp
 )
@@ -76,13 +74,13 @@ set(FlatBuffers_Sample_Text_SRCS
 
 if(APPLE)
   set(CMAKE_CXX_FLAGS
-    "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++ -Wall -pedantic -Werror -Wextra")
+    "${CMAKE_CXX_FLAGS} -stdlib=libc++ -Wall -pedantic -Werror -Wextra -Wno-long-long -Wno-c++0x-compat")
 elseif(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS
-    "${CMAKE_CXX_FLAGS} -std=c++0x -Wall -pedantic -Werror -Wextra")
+    "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra -Wno-long-long -Wno-c++0x-compat -I/data/mwrep/res/osp/Boost/13-0-0-10/include")
 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   set(CMAKE_CXX_FLAGS
-    "${CMAKE_CXX_FLAGS} -std=c++0x -stdlib=libc++ -Wall -pedantic -Werror -Wextra")
+    "${CMAKE_CXX_FLAGS} -stdlib=libc++ -Wall -pedantic -Werror -Wextra -Wno-long-long -Wno-c++0x-compat")
 endif()
 
 if(FLATBUFFERS_CODE_COVERAGE)
@@ -152,7 +150,7 @@ endif()
 if(FLATBUFFERS_BUILD_TESTS)
   enable_testing()
 
-  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/tests" DESTINATION
-       "${CMAKE_CURRENT_BINARY_DIR}")
+  #file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/tests" DESTINATION
+  #     "${CMAKE_CURRENT_BINARY_DIR}")
   add_test(NAME flattests COMMAND flattests)
 endif()

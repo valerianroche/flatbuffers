@@ -122,7 +122,7 @@ std::string GetAnyValueS(reflection::BaseType type, const uint8_t *data,
 // Get any table field as a 64bit int, regardless of what type it is.
 inline int64_t GetAnyFieldI(const Table &table,
                             const reflection::Field &field) {
-  auto field_ptr = table.GetAddressOf(field.offset());
+  const uint8_t * field_ptr = table.GetAddressOf(field.offset());
   return field_ptr ? GetAnyValueI(field.type()->base_type(), field_ptr)
                    : field.default_integer();
 }
@@ -130,7 +130,7 @@ inline int64_t GetAnyFieldI(const Table &table,
 // Get any table field as a double, regardless of what type it is.
 inline double GetAnyFieldF(const Table &table,
                            const reflection::Field &field) {
-  auto field_ptr = table.GetAddressOf(field.offset());
+  const uint8_t * field_ptr = table.GetAddressOf(field.offset());
   return field_ptr ? GetAnyValueF(field.type()->base_type(), field_ptr)
                    : field.default_real();
 }
@@ -142,7 +142,7 @@ inline double GetAnyFieldF(const Table &table,
 inline std::string GetAnyFieldS(const Table &table,
                                 const reflection::Field &field,
                                 const reflection::Schema *schema) {
-  auto field_ptr = table.GetAddressOf(field.offset());
+  const uint8_t * field_ptr = table.GetAddressOf(field.offset());
   return field_ptr ? GetAnyValueS(field.type()->base_type(), field_ptr, schema,
                                   field.type()->index())
                    : "";
@@ -193,7 +193,7 @@ inline std::string GetAnyVectorElemS(const VectorOfAny *vec,
 // Warning: does no typechecking.
 template<typename T> T *GetAnyVectorElemPointer(const VectorOfAny *vec,
                                                 size_t i) {
-  auto elem_ptr = vec->Data() + sizeof(uoffset_t) * i;
+  uint8_t * elem_ptr = vec->Data() + sizeof(uoffset_t) * i;
   return (T *)(elem_ptr + ReadScalar<uoffset_t>(elem_ptr));
 }
 
@@ -241,7 +241,7 @@ void SetAnyValueS(reflection::BaseType type, uint8_t *data, const char *val);
 // Set any table field as a 64bit int, regardless of type what it is.
 inline bool SetAnyFieldI(Table *table, const reflection::Field &field,
                          int64_t val) {
-  auto field_ptr = table->GetAddressOf(field.offset());
+  uint8_t * field_ptr = table->GetAddressOf(field.offset());
   if (!field_ptr) return false;
   SetAnyValueI(field.type()->base_type(), field_ptr, val);
   return true;
@@ -250,7 +250,7 @@ inline bool SetAnyFieldI(Table *table, const reflection::Field &field,
 // Set any table field as a double, regardless of what type it is.
 inline bool SetAnyFieldF(Table *table, const reflection::Field &field,
                          double val) {
-  auto field_ptr = table->GetAddressOf(field.offset());
+  uint8_t * field_ptr = table->GetAddressOf(field.offset());
   if (!field_ptr) return false;
   SetAnyValueF(field.type()->base_type(), field_ptr, val);
   return true;
@@ -259,7 +259,7 @@ inline bool SetAnyFieldF(Table *table, const reflection::Field &field,
 // Set any table field as a string, regardless of what type it is.
 inline bool SetAnyFieldS(Table *table, const reflection::Field &field,
                   const char *val) {
-  auto field_ptr = table->GetAddressOf(field.offset());
+  uint8_t * field_ptr = table->GetAddressOf(field.offset());
   if (!field_ptr) return false;
   SetAnyValueS(field.type()->base_type(), field_ptr, val);
   return true;
@@ -339,13 +339,13 @@ template<typename T, typename U> pointer_inside_vector<T, U> piv(T *ptr,
 inline const reflection::Object &GetUnionType(
     const reflection::Schema &schema, const reflection::Object &parent,
     const reflection::Field &unionfield, const Table &table) {
-  auto enumdef = schema.enums()->Get(unionfield.type()->index());
+  Vector<Offset<reflection::Enum> >::return_type enumdef = schema.enums()->Get(unionfield.type()->index());
   // TODO: this is clumsy and slow, but no other way to find it?
-  auto type_field = parent.fields()->LookupByKey(
+  Vector<Offset<reflection::Field> >::return_type type_field = parent.fields()->LookupByKey(
             (unionfield.name()->str() + "_type").c_str());
   assert(type_field);
-  auto union_type = GetFieldI<uint8_t>(table, *type_field);
-  auto enumval = enumdef->values()->LookupByKey(union_type);
+  uint8_t union_type = GetFieldI<uint8_t>(table, *type_field);
+  Vector<Offset<reflection::EnumVal> >::return_type enumval = enumdef->values()->LookupByKey(union_type);
   return *enumval->object();
 }
 
@@ -372,16 +372,16 @@ template <typename T>
 void ResizeVector(const reflection::Schema &schema, uoffset_t newsize, T val,
                   const Vector<T> *vec, std::vector<uint8_t> *flatbuf,
                   const reflection::Object *root_table = nullptr) {
-  auto delta_elem = static_cast<int>(newsize) - static_cast<int>(vec->size());
-  auto newelems = ResizeAnyVector(schema, newsize,
+  int delta_elem = static_cast<int>(newsize) - static_cast<int>(vec->size());
+  uint8_t * newelems = ResizeAnyVector(schema, newsize,
                                   reinterpret_cast<const VectorOfAny *>(vec),
                                   vec->size(),
                                   static_cast<uoffset_t>(sizeof(T)), flatbuf,
                                   root_table);
   // Set new elements to "val".
   for (int i = 0; i < delta_elem; i++) {
-    auto loc = newelems + i * sizeof(T);
-    auto is_scalar = std::is_scalar<T>::value;
+    uint8_t * loc = newelems + i * sizeof(T);
+    bool is_scalar = boost::is_scalar<T>::value;
     if (is_scalar) {
       WriteScalar(loc, val);
     } else {  // struct
