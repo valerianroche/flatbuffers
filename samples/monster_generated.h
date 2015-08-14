@@ -59,16 +59,28 @@ MANUALLY_ALIGNED_STRUCT(4) Vec3 FLATBUFFERS_FINAL_CLASS {
 STRUCT_END(Vec3, 12);
 
 struct Monster FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef const Vec3 *pos_ret;
+  typedef Vec3 pos_t;
   const Vec3 *pos() const { return GetStruct<const Vec3 *>(4); }
   Vec3 *mutable_pos() { return GetStruct<Vec3 *>(4); }
+  typedef int16_t mana_ret;
+  typedef int16_t mana_t;
   int16_t mana() const { return GetField<int16_t>(6, 150); }
   bool mutate_mana(int16_t mana) { return SetField(6, mana); }
+  typedef int16_t hp_ret;
+  typedef int16_t hp_t;
   int16_t hp() const { return GetField<int16_t>(8, 100); }
   bool mutate_hp(int16_t hp) { return SetField(8, hp); }
+  typedef const flatbuffers::String *name_ret;
+  typedef flatbuffers::String name_t;
   const flatbuffers::String *name() const { return GetPointer<const flatbuffers::String *>(10); }
   flatbuffers::String *mutable_name() { return GetPointer<flatbuffers::String *>(10); }
+  typedef const flatbuffers::Vector<uint8_t>  *inventory_ret;
+  typedef flatbuffers::Vector<uint8_t>  inventory_t;
   const flatbuffers::Vector<uint8_t>  *inventory() const { return GetPointer<const flatbuffers::Vector<uint8_t>  *>(14); }
   flatbuffers::Vector<uint8_t>  *mutable_inventory() { return GetPointer<flatbuffers::Vector<uint8_t>  *>(14); }
+  typedef Color color_ret;
+  typedef Color color_t;
   Color color() const { return static_cast<Color>(GetField<int8_t>(16, 2)); }
   bool mutate_color(Color color) { return SetField(16, static_cast<int8_t>(color)); }
   bool Verify(flatbuffers::Verifier &verifier) const {

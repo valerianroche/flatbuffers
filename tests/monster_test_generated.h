@@ -95,10 +95,16 @@ MANUALLY_ALIGNED_STRUCT(16) Vec3 FLATBUFFERS_FINAL_CLASS {
 STRUCT_END(Vec3, 32);
 
 struct Stat FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef const flatbuffers::String *id_ret;
+  typedef flatbuffers::String id_t;
   const flatbuffers::String *id() const { return GetPointer<const flatbuffers::String *>(4); }
   flatbuffers::String *mutable_id() { return GetPointer<flatbuffers::String *>(4); }
+  typedef int64_t val_ret;
+  typedef int64_t val_t;
   int64_t val() const { return GetField<int64_t>(6, 0); }
   bool mutate_val(int64_t val) { return SetField(6, val); }
+  typedef uint16_t count_ret;
+  typedef uint16_t count_t;
   uint16_t count() const { return GetField<uint16_t>(8, 0); }
   bool mutate_count(uint16_t count) { return SetField(8, count); }
   bool Verify(flatbuffers::Verifier &verifier) const {
@@ -137,55 +143,101 @@ inline flatbuffers::Offset<Stat> CreateStat(flatbuffers::FlatBufferBuilder &_fbb
 }
 
 struct Monster FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef const Vec3 *pos_ret;
+  typedef Vec3 pos_t;
   const Vec3 *pos() const { return GetStruct<const Vec3 *>(4); }
   Vec3 *mutable_pos() { return GetStruct<Vec3 *>(4); }
+  typedef int16_t mana_ret;
+  typedef int16_t mana_t;
   int16_t mana() const { return GetField<int16_t>(6, 150); }
   bool mutate_mana(int16_t mana) { return SetField(6, mana); }
+  typedef int16_t hp_ret;
+  typedef int16_t hp_t;
   int16_t hp() const { return GetField<int16_t>(8, 100); }
   bool mutate_hp(int16_t hp) { return SetField(8, hp); }
+  typedef const flatbuffers::String *name_ret;
+  typedef flatbuffers::String name_t;
   const flatbuffers::String *name() const { return GetPointer<const flatbuffers::String *>(10); }
   flatbuffers::String *mutable_name() { return GetPointer<flatbuffers::String *>(10); }
   bool KeyCompareLessThan(const Monster *o) const { return *name() < *o->name(); }
   int KeyCompareWithValue(const char *val) const { return strcmp(name()->c_str(), val); }
+  typedef const flatbuffers::Vector<uint8_t>  *inventory_ret;
+  typedef flatbuffers::Vector<uint8_t>  inventory_t;
   const flatbuffers::Vector<uint8_t>  *inventory() const { return GetPointer<const flatbuffers::Vector<uint8_t>  *>(14); }
   flatbuffers::Vector<uint8_t>  *mutable_inventory() { return GetPointer<flatbuffers::Vector<uint8_t>  *>(14); }
+  typedef Color color_ret;
+  typedef Color color_t;
   Color color() const { return static_cast<Color>(GetField<int8_t>(16, 8)); }
   bool mutate_color(Color color) { return SetField(16, static_cast<int8_t>(color)); }
+  typedef Any test_type_ret;
+  typedef Any test_type_t;
   Any test_type() const { return static_cast<Any>(GetField<uint8_t>(18, 0)); }
   bool mutate_test_type(Any test_type) { return SetField(18, static_cast<uint8_t>(test_type)); }
+  typedef const void *test_ret;
+  typedef void test_t;
   const void *test() const { return GetPointer<const void *>(20); }
   void *mutable_test() { return GetPointer<void *>(20); }
+  typedef const flatbuffers::Vector<const Test *>  *test4_ret;
+  typedef flatbuffers::Vector<const Test *>  test4_t;
   const flatbuffers::Vector<const Test *>  *test4() const { return GetPointer<const flatbuffers::Vector<const Test *>  *>(22); }
   flatbuffers::Vector<const Test *>  *mutable_test4() { return GetPointer<flatbuffers::Vector<const Test *>  *>(22); }
+  typedef const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String> >  *testarrayofstring_ret;
+  typedef flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String> >  testarrayofstring_t;
   const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String> >  *testarrayofstring() const { return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String> >  *>(24); }
   flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String> >  *mutable_testarrayofstring() { return GetPointer<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String> >  *>(24); }
   /// an example documentation comment: this will end up in the generated code
   /// multiline too
+  typedef const flatbuffers::Vector<flatbuffers::Offset<Monster> >  *testarrayoftables_ret;
+  typedef flatbuffers::Vector<flatbuffers::Offset<Monster> >  testarrayoftables_t;
   const flatbuffers::Vector<flatbuffers::Offset<Monster> >  *testarrayoftables() const { return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<Monster> >  *>(26); }
   flatbuffers::Vector<flatbuffers::Offset<Monster> >  *mutable_testarrayoftables() { return GetPointer<flatbuffers::Vector<flatbuffers::Offset<Monster> >  *>(26); }
+  typedef const Monster *enemy_ret;
+  typedef Monster enemy_t;
   const Monster *enemy() const { return GetPointer<const Monster *>(28); }
   Monster *mutable_enemy() { return GetPointer<Monster *>(28); }
+  typedef const flatbuffers::Vector<uint8_t>  *testnestedflatbuffer_ret;
+  typedef flatbuffers::Vector<uint8_t>  testnestedflatbuffer_t;
   const flatbuffers::Vector<uint8_t>  *testnestedflatbuffer() const { return GetPointer<const flatbuffers::Vector<uint8_t>  *>(30); }
   flatbuffers::Vector<uint8_t>  *mutable_testnestedflatbuffer() { return GetPointer<flatbuffers::Vector<uint8_t>  *>(30); }
   const MyGame::Example::Monster *testnestedflatbuffer_nested_root() const { return flatbuffers::GetRoot<MyGame::Example::Monster>(testnestedflatbuffer()->Data()); }
+  typedef const Stat *testempty_ret;
+  typedef Stat testempty_t;
   const Stat *testempty() const { return GetPointer<const Stat *>(32); }
   Stat *mutable_testempty() { return GetPointer<Stat *>(32); }
+  typedef uint8_t testbool_ret;
+  typedef uint8_t testbool_t;
   uint8_t testbool() const { return GetField<uint8_t>(34, 0); }
   bool mutate_testbool(uint8_t testbool) { return SetField(34, testbool); }
+  typedef int32_t testhashs32_fnv1_ret;
+  typedef int32_t testhashs32_fnv1_t;
   int32_t testhashs32_fnv1() const { return GetField<int32_t>(36, 0); }
   bool mutate_testhashs32_fnv1(int32_t testhashs32_fnv1) { return SetField(36, testhashs32_fnv1); }
+  typedef uint32_t testhashu32_fnv1_ret;
+  typedef uint32_t testhashu32_fnv1_t;
   uint32_t testhashu32_fnv1() const { return GetField<uint32_t>(38, 0); }
   bool mutate_testhashu32_fnv1(uint32_t testhashu32_fnv1) { return SetField(38, testhashu32_fnv1); }
+  typedef int64_t testhashs64_fnv1_ret;
+  typedef int64_t testhashs64_fnv1_t;
   int64_t testhashs64_fnv1() const { return GetField<int64_t>(40, 0); }
   bool mutate_testhashs64_fnv1(int64_t testhashs64_fnv1) { return SetField(40, testhashs64_fnv1); }
+  typedef uint64_t testhashu64_fnv1_ret;
+  typedef uint64_t testhashu64_fnv1_t;
   uint64_t testhashu64_fnv1() const { return GetField<uint64_t>(42, 0); }
   bool mutate_testhashu64_fnv1(uint64_t testhashu64_fnv1) { return SetField(42, testhashu64_fnv1); }
+  typedef int32_t testhashs32_fnv1a_ret;
+  typedef int32_t testhashs32_fnv1a_t;
   int32_t testhashs32_fnv1a() const { return GetField<int32_t>(44, 0); }
   bool mutate_testhashs32_fnv1a(int32_t testhashs32_fnv1a) { return SetField(44, testhashs32_fnv1a); }
+  typedef uint32_t testhashu32_fnv1a_ret;
+  typedef uint32_t testhashu32_fnv1a_t;
   uint32_t testhashu32_fnv1a() const { return GetField<uint32_t>(46, 0); }
   bool mutate_testhashu32_fnv1a(uint32_t testhashu32_fnv1a) { return SetField(46, testhashu32_fnv1a); }
+  typedef int64_t testhashs64_fnv1a_ret;
+  typedef int64_t testhashs64_fnv1a_t;
   int64_t testhashs64_fnv1a() const { return GetField<int64_t>(48, 0); }
   bool mutate_testhashs64_fnv1a(int64_t testhashs64_fnv1a) { return SetField(48, testhashs64_fnv1a); }
+  typedef uint64_t testhashu64_fnv1a_ret;
+  typedef uint64_t testhashu64_fnv1a_t;
   uint64_t testhashu64_fnv1a() const { return GetField<uint64_t>(50, 0); }
   bool mutate_testhashu64_fnv1a(uint64_t testhashu64_fnv1a) { return SetField(50, testhashu64_fnv1a); }
   bool Verify(flatbuffers::Verifier &verifier) const {

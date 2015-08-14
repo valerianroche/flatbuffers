@@ -240,6 +240,10 @@ static void GenTable(const Parser &parser, StructDef &struct_def,
     if (!field.deprecated) {  // Deprecated fields won't be accessible.
       bool is_scalar = IsScalar(field.value.type.base_type);
       GenComment(field.doc_comment, code_ptr, nullptr, "  ");
+      code += "  typedef " + GenTypeGet(parser, field.value.type, " ", "const ", " *", // TODO
+              true) + field.name + "_ret;\n";                                      // TODO
+      code += "  typedef " + GenTypeGet(parser, field.value.type, " ", "", " ", // TODO
+              true) + field.name + "_t;\n";
       code += "  " + GenTypeGet(parser, field.value.type, " ", "const ", " *",
                                 true);
       code += field.name + "() const { return ";
